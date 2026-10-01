@@ -41,6 +41,23 @@ Exemplo de saída no Linux:
 ============================================================
 ```
 
+## Pastas de projeto
+
+Se você apontar para uma **pasta** (em vez de um arquivo), ele reconhece o tipo de projeto
+e mostra os comandos para prepará-lo e compilá-lo:
+
+| Pasta contém | Projeto | Comandos |
+|---|---|---|
+| `configure` / `configure.ac` | C/C++ (Autotools) | `./configure` → `make` |
+| `CMakeLists.txt` | C/C++ (CMake) | `cmake -B build` → `cmake --build build` |
+| `Makefile` | Genérico | `make` |
+| `package.json` | Node.js | `npm install` → `npm start` |
+| `requirements.txt` | Python | `pip install -r requirements.txt` |
+| `Cargo.toml` | Rust | `cargo run` |
+| `go.mod` | Go | `go build ./...` |
+| `pom.xml` / `build.gradle` | Java | `mvn package` / `gradle build` |
+| `composer.json` / `Gemfile` | PHP / Ruby | `composer install` / `bundle install` |
+
 ## Como ele descobre a linguagem
 
 1. **Extensão do arquivo** — `.py`, `.js`, `.ts`, `.sh`, `.ps1`, `.bat`, `.cmd`, `.rb`, `.pl`, `.php`,

@@ -137,8 +137,45 @@ def test_arquivo_inexistente(tmp_path):
         a.analisar(str(tmp_path / "nada.py"), "linux")
 
 
-def test_pasta_nao_e_arquivo(tmp_path):
-    with pytest.raises(a.ErroAnalise, match="pasta"):
+def test_pasta_de_projeto_autotools(tmp_path):
+    (tmp_path / "configure").write_text("#!/bin/sh\n")
+    (tmp_path / "Makefile.am").write_text("")
+    r = a.analisar(str(tmp_path), "linux", which_com("make"))
+    assert r.eh_pasta
+    assert r.linguagem.nome == "Projeto C/C++ (Autotools)"
+    assert r.comandos == [f"cd {tmp_path}", "./configure", "make"]
+    assert any("compilado" in aviso for aviso in r.avisos)
+
+
+def test_pasta_de_projeto_prioriza_configure_sobre_makefile(tmp_path):
+    (tmp_path / "configure").write_text("")
+    (tmp_path / "Makefile").write_text("all:\n")
+    r = a.analisar(str(tmp_path), "linux", which_com("make"))
+    assert r.linguagem.nome == "Projeto C/C++ (Autotools)"
+
+
+def test_pasta_makefile_puro(tmp_path):
+    (tmp_path / "Makefile").write_text("all:\n")
+    r = a.analisar(str(tmp_path), "linux", which_com("make"))
+    assert r.comandos == [f"cd {tmp_path}", "make"]
+
+
+def test_pasta_python_requirements(tmp_path):
+    (tmp_path / "requirements.txt").write_text("requests\n")
+    r = a.analisar(str(tmp_path), "linux", which_com("pip"))
+    assert r.comandos == [f"cd {tmp_path}", "pip install -r requirements.txt"]
+
+
+def test_pasta_ferramenta_ausente_avisa(tmp_path):
+    (tmp_path / "Cargo.toml").write_text("[package]\n")
+    r = a.analisar(str(tmp_path), "linux", which_com())
+    assert r.interpretador is None
+    assert any("cargo" in aviso for aviso in r.avisos)
+
+
+def test_pasta_sem_marcador_conhecido(tmp_path):
+    (tmp_path / "leiame.txt").write_text("nada\n")
+    with pytest.raises(a.ErroAnalise, match="não reconheci o tipo de projeto"):
         a.analisar(str(tmp_path), "linux")
 
 
