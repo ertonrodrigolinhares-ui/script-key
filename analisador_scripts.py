@@ -112,6 +112,95 @@ NOMES_SISTEMA = {"windows": "Windows", "linux": "Linux", "macos": "macOS"}
 
 
 # ---------------------------------------------------------------------------
+# Projetos: quando o caminho é uma PASTA, descobre como preparar/compilar.
+# São projetos genéricos (valem para qualquer código nessa tecnologia).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Projeto:
+    nome: str                       # tipo de projeto
+    requisito: str                  # o que precisa estar instalado
+    ferramenta: str                 # programa de build, para checar com shutil.which ("" = não checa)
+    passos: Tuple[str, ...]         # comandos de preparação/compilação, em ordem
+    observacao: str = ""            # nota extra (ex.: no Windows precisa de WSL)
+    instalar: str = ""              # onde conseguir a ferramenta
+
+
+AUTOTOOLS = Projeto(
+    "Projeto C/C++ (Autotools)", "Compilador C/C++ e make", "make",
+    ("./configure", "make"),
+    observacao=("Programa em C/C++ que precisa ser compilado. No Windows, compile pelo WSL, "
+                "MSYS2 ou Cygwin. Depois rode o programa gerado (ex.: ./nome-do-programa --help)."),
+    instalar="Linux: sudo apt install build-essential")
+CMAKE = Projeto(
+    "Projeto C/C++ (CMake)", "CMake e um compilador C/C++", "cmake",
+    ("cmake -B build", "cmake --build build"),
+    observacao="Depois de compilar, o programa fica na pasta 'build'.",
+    instalar="https://cmake.org/download")
+MAKE = Projeto(
+    "Projeto com Makefile", "make e o compilador que o projeto usar", "make",
+    ("make",),
+    observacao="Leia o README do projeto; alguns Makefiles têm alvos como 'make install'.")
+NODE_PROJ = Projeto(
+    "Projeto Node.js", "Node.js", "npm",
+    ("npm install", "npm start"),
+    observacao="Se não houver 'start', veja os comandos em 'scripts' no arquivo package.json.",
+    instalar="https://nodejs.org")
+PYTHON_REQ = Projeto(
+    "Projeto Python", "Python 3", "pip",
+    ("pip install -r requirements.txt",),
+    observacao="Depois, rode o arquivo principal, geralmente 'python main.py' ou 'python app.py'.",
+    instalar="https://www.python.org/downloads")
+PYTHON_PKG = Projeto(
+    "Pacote Python", "Python 3", "pip",
+    ("pip install .",),
+    instalar="https://www.python.org/downloads")
+RUST = Projeto(
+    "Projeto Rust (Cargo)", "Rust e Cargo", "cargo",
+    ("cargo run",),
+    instalar="https://www.rust-lang.org/tools/install")
+GO_PROJ = Projeto(
+    "Projeto Go", "Go", "go",
+    ("go build ./...",),
+    observacao="Para rodar sem gerar o executável: 'go run .'.",
+    instalar="https://go.dev/dl")
+MAVEN = Projeto(
+    "Projeto Java (Maven)", "Java JDK e Maven", "mvn",
+    ("mvn package",),
+    instalar="https://maven.apache.org")
+GRADLE = Projeto(
+    "Projeto Java (Gradle)", "Java JDK e Gradle", "gradle",
+    ("gradle build",),
+    instalar="https://gradle.org")
+COMPOSER = Projeto(
+    "Projeto PHP (Composer)", "PHP e Composer", "composer",
+    ("composer install",),
+    instalar="https://getcomposer.org")
+BUNDLER = Projeto(
+    "Projeto Ruby (Bundler)", "Ruby e Bundler", "bundle",
+    ("bundle install",),
+    instalar="https://bundler.io")
+
+# Arquivo que marca o tipo de projeto (em minúsculas) -> projeto, em ordem de prioridade.
+# Autotools/CMake vêm antes de 'Makefile' puro porque também costumam trazer um Makefile.
+MARCADORES_PROJETO: Tuple[Tuple[str, Projeto], ...] = (
+    ("configure", AUTOTOOLS), ("configure.ac", AUTOTOOLS), ("autogen.sh", AUTOTOOLS),
+    ("cmakelists.txt", CMAKE),
+    ("package.json", NODE_PROJ),
+    ("cargo.toml", RUST),
+    ("go.mod", GO_PROJ),
+    ("pom.xml", MAVEN),
+    ("build.gradle", GRADLE), ("build.gradle.kts", GRADLE),
+    ("composer.json", COMPOSER),
+    ("gemfile", BUNDLER),
+    ("requirements.txt", PYTHON_REQ),
+    ("pyproject.toml", PYTHON_PKG), ("setup.py", PYTHON_PKG),
+    ("makefile", MAKE), ("gnumakefile", MAKE),
+)
+
+
+# ---------------------------------------------------------------------------
 # Resultado
 # ---------------------------------------------------------------------------
 
@@ -129,6 +218,7 @@ class Resultado:
     interpretador: Optional[str]             # caminho encontrado no sistema (None = não instalado)
     comandos: List[str] = field(default_factory=list)
     avisos: List[str] = field(default_factory=list)
+    eh_pasta: bool = False                    # True quando o caminho é uma pasta de projeto
 
 
 # ---------------------------------------------------------------------------
@@ -247,10 +337,43 @@ def caminho_executavel(caminho: str) -> str:
     return "./" + caminho
 
 
+def analisar_pasta(caminho: str, sistema: str,
+                   which: Callable[[str], Optional[str]]) -> Resultado:
+    """Quando o caminho é uma pasta, descobre o tipo de projeto e os comandos para prepará-lo."""
+    arquivos = {nome.lower() for nome in os.listdir(caminho)}
+    for marcador, projeto in MARCADORES_PROJETO:
+        if marcador in arquivos:
+            break
+    else:
+        raise ErroAnalise(
+            "É uma pasta, mas não reconheci o tipo de projeto (não achei configure, Makefile, "
+            "package.json, requirements.txt, Cargo.toml e afins). Abra a pasta e arraste um "
+            "arquivo de script específico.")
+
+    # Reaproveita o Resultado usando um 'Linguagem' sintético só para nome e requisito.
+    falso = Linguagem(projeto.nome, projeto.requisito)
+    resultado = Resultado(caminho, sistema, falso, f"pasta de projeto ({marcador})",
+                          interpretador=None, eh_pasta=True)
+    if projeto.ferramenta:
+        local = which(projeto.ferramenta)
+        resultado.interpretador = local
+        if not local:
+            dica = f" Baixe em: {projeto.instalar}" if projeto.instalar else ""
+            resultado.avisos.append(f"{projeto.requisito}: '{projeto.ferramenta}' não foi encontrado "
+                                    f"neste computador.{dica}")
+    resultado.comandos.append(f"cd {citar(caminho, sistema)}")
+    resultado.comandos.extend(projeto.passos)
+    if projeto.observacao:
+        resultado.avisos.append(projeto.observacao)
+    return resultado
+
+
 def analisar(caminho: str, sistema: Optional[str] = None,
              which: Callable[[str], Optional[str]] = shutil.which) -> Resultado:
-    """Analisa o script e monta as instruções de execução."""
+    """Analisa o script (ou pasta de projeto) e monta as instruções de execução."""
     sistema = sistema or sistema_atual()
+    if os.path.isdir(caminho):
+        return analisar_pasta(caminho, sistema, which)
     texto = ler_texto(caminho)
     linguagem, origem = detectar(caminho, texto)
     resultado = Resultado(caminho, sistema, linguagem, origem, interpretador=None)
@@ -307,11 +430,13 @@ def analisar(caminho: str, sistema: Optional[str] = None,
 
 
 def formatar(resultado: Resultado) -> str:
+    rotulo_alvo = "Pasta" if resultado.eh_pasta else "Arquivo"
+    rotulo_tipo = "Projeto" if resultado.eh_pasta else "Linguagem"
     linhas = [
         "=" * 60,
-        f" Arquivo:      {resultado.arquivo}",
-        f" Sistema:      {NOMES_SISTEMA[resultado.sistema]}",
-        f" Linguagem:    {resultado.linguagem.nome}  (detectada por {resultado.origem})",
+        f" {(rotulo_alvo + ':').ljust(13)} {resultado.arquivo}",
+        f" {'Sistema:'.ljust(13)} {NOMES_SISTEMA[resultado.sistema]}",
+        f" {(rotulo_tipo + ':').ljust(13)} {resultado.linguagem.nome}  (por {resultado.origem})",
         f" Requisito:    {resultado.linguagem.requisito}",
     ]
     if resultado.interpretador:
@@ -319,7 +444,9 @@ def formatar(resultado: Resultado) -> str:
     elif resultado.comandos:
         linhas.append(" Instalado em: NÃO ENCONTRADO")
     if resultado.comandos:
-        linhas += ["-" * 60, " Copie e cole no terminal:", ""]
+        titulo = " Copie e cole no terminal (um comando por vez):" if resultado.eh_pasta \
+            else " Copie e cole no terminal:"
+        linhas += ["-" * 60, titulo, ""]
         linhas += [f"   {c}" for c in resultado.comandos]
     for aviso in resultado.avisos:
         linhas.append(f"\n ⚠ {aviso}")
