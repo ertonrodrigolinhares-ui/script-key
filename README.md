@@ -10,6 +10,13 @@ Só precisa do Python 3.8+ — nenhuma biblioteca extra.
 
 ## Como usar
 
+### No Windows, sem terminal
+
+Arraste o script (ou vários) **em cima do arquivo `Analisar Script.bat`**. A janela abre já com o resultado.
+Se abrir o `Analisar Script.bat` com dois cliques, ele pergunta o caminho: arraste o script para a janela e aperte Enter.
+
+### Pelo terminal
+
 ```bash
 python analisador_scripts.py caminho/do/script.sh
 ```
