@@ -1,0 +1,3 @@
+anthropic>=1.15
+fastapi>=0.132
+uvicorn>=0.29
