@@ -248,11 +248,12 @@ async function abrirConfig() {
     if (ia.pendentes) avisos.push(`${ia.pendentes} item(ns) [DEFINIR] ainda sem preencher em instrucoes.md`);
     if (ia.documentos_fora.length) avisos.push(`${ia.documentos_fora.length} documento(s) grandes demais, ignorados: ${ia.documentos_fora.join(", ")}`);
     if (ia.pesquisa_desligada) avisos.push("pesquisa na web DESLIGADA: fontes.txt não tem nenhum site válido");
-    if (ia.robo) avisos.push("robô de atualização: " + ia.robo);
+    if (ia.robo && ia.robo.includes("com falha")) avisos.push("robô de atualização: " + ia.robo);
     if (ia.fontes_recusadas.length) avisos.push(`linhas de fontes.txt ignoradas (não são um site válido): ${ia.fontes_recusadas.join(" | ")}`);
   }
   $("ia-resumo").textContent = ia
-    ? `Pasta: ${ia.pasta} · Documentos na base: ${ia.documentos} · Pesquisa na web: ${ia.fontes.length ? ia.fontes.join(", ") : "qualquer site"}` +
+    ? `Pasta: ${ia.pasta} · Documentos na base: ${ia.documentos} · Pesquisa na web: ${ia.pesquisa_desligada ? "desligada" : ia.fontes.length ? ia.fontes.join(", ") : "qualquer site"}` +
+      (ia.robo && !ia.robo.includes("com falha") ? ` · Robô de atualização: ${ia.robo}` : "") +
       (avisos.length ? " · ⚠ " + avisos.join(" · ⚠ ") : "") +
       " · Mudanças na pasta valem na próxima conversa (Nova conversa)."
     : "";

@@ -897,3 +897,47 @@ def test_avaliador_com_veredito_e_motivo_na_mesma_linha_ou_cortado():
     assert avaliar.julgar(cliente("ERRADO — disse 10, esperado 31."), "p", "e", "r") == (False, "disse 10, esperado 31.")
     assert avaliar.julgar(cliente("**CERTO**\nbateu"), "p", "e", "r") == (True, "bateu")
     assert avaliar.julgar(cliente("ERRADO", "max_tokens"), "p", "e", "r")[0] is None
+
+
+# ---------- últimos ajustes ----------
+
+def test_fontes_com_rotulos_de_varias_palavras_e_tracos():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "fontes.txt").write_text(
+        "Receita Federal: www.gov.br/receitafederal\nDiário Oficial: www.in.gov.br\n1 - www.planalto.gov.br\n"
+        "a) stf.jus.br\n– www.stj.jus.br\nPlanalto (www.planalto.gov.br)\nBanco do Brasil S.A.: www.bb.com.br\n",
+        encoding="utf-8",
+    )
+    aceitos, recusados = especialidade.fontes()
+    assert aceitos == ["www.gov.br", "www.in.gov.br", "www.planalto.gov.br", "stf.jus.br", "www.stj.jus.br", "www.bb.com.br"]
+    assert recusados == []
+
+
+def test_arquivo_ansi_curto_mantem_os_acentos():
+    from atlas.especialidade import decodificar
+
+    assert decodificar("Horário: 8h às 17h".encode("cp1252")) == "Horário: 8h às 17h"
+
+
+def test_documento_com_nome_comecando_por_sublinhado_entra_na_base():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "conhecimento" / "_tabela.txt").write_text("Tabela importante", encoding="utf-8")
+    assert "Tabela importante" in especialidade.documentos()[0]
+
+
+def test_resposta_esperada_numerica_vale():
+    import json
+
+    from atlas import avaliar
+
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text(
+        json.dumps([{"pergunta": "Quanto é 2+2?", "resposta_esperada": 4}, {"pergunta": True, "resposta_esperada": "x"}]),
+        encoding="utf-8",
+    )
+    perguntas, ignoradas = avaliar.carregar_perguntas()
+    assert perguntas[0]["resposta_esperada"] == "4" and ignoradas == 1

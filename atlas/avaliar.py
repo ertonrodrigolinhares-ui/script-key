@@ -38,7 +38,7 @@ class PerguntasInvalidas(Exception):
 
 
 def carregar_perguntas() -> tuple[list[dict], int]:
-    """Devolve (perguntas válidas, quantas foram ignoradas por faltar campo)."""
+    """Devolve (perguntas válidas, quantas foram ignoradas por campo vazio ou inválido)."""
     arquivo = pasta_ia() / "perguntas_teste.json"
     if not arquivo.exists():
         raise PerguntasInvalidas(f"Não encontrei {arquivo}.")
@@ -51,10 +51,18 @@ def carregar_perguntas() -> tuple[list[dict], int]:
         ) from None
     if not isinstance(dados, list):
         raise PerguntasInvalidas("perguntas_teste.json precisa ser uma lista: [ {...}, {...} ].")
-    def preenchido(p: object, campo: str) -> bool:
-        return isinstance(p, dict) and isinstance(p.get(campo), str) and bool(p[campo].strip())
+    def valor(p: object, campo: str) -> str:
+        """Texto ou número viram texto; vazio, nulo, verdadeiro/falso contam como faltando."""
+        v = p.get(campo) if isinstance(p, dict) else None
+        if isinstance(v, bool) or not isinstance(v, (str, int, float)):
+            return ""
+        return str(v).strip()
 
-    validas = [p for p in dados if preenchido(p, "pergunta") and preenchido(p, "resposta_esperada")]
+    validas = [
+        {**p, "pergunta": valor(p, "pergunta"), "resposta_esperada": valor(p, "resposta_esperada")}
+        for p in dados
+        if valor(p, "pergunta") and valor(p, "resposta_esperada")
+    ]
     return validas, len(dados) - len(validas)
 
 
@@ -160,7 +168,7 @@ def avaliar(cliente: anthropic.Anthropic | None = None) -> str:
             f"# Resultado do teste — {inicio}\n\n"
             f"**Acertos: {certos} de {avaliadas}** ({(100 * certos // avaliadas) if avaliadas else 0}%)"
             + (f" · {sem_nota} não avaliada(s)" if sem_nota else "")
-            + (f" · {ignoradas} pergunta(s) ignorada(s) por faltar campo" if ignoradas else "")
+            + (f" · {ignoradas} pergunta(s) ignorada(s) por campo vazio ou inválido" if ignoradas else "")
             + (f" · teste em andamento ({i} de {len(perguntas)})" if i < len(perguntas) else "")
             + "\n\nOnde errou: ajuste ia/instrucoes.md ou acrescente um documento em ia/conhecimento/, "
             "clique em Nova conversa e rode o teste de novo.\n\n"
@@ -168,7 +176,7 @@ def avaliar(cliente: anthropic.Anthropic | None = None) -> str:
         _gravar(cabecalho, linhas)
 
     extra = f", {sem_nota} não avaliada(s)" if sem_nota else ""
-    extra += f", {ignoradas} ignorada(s) por faltar campo" if ignoradas else ""
+    extra += f", {ignoradas} ignorada(s) por campo vazio ou inválido" if ignoradas else ""
     return f"Acertos: {certos} de {certos + errados}{extra}. Relatório completo em {pasta_ia() / 'resultado_teste.md'}"
 
 

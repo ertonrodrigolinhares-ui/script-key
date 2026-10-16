@@ -16,6 +16,7 @@ from .persona import SISTEMA
 LIMITE_DOCUMENTOS = 600_000  # caracteres (~150 mil tokens); o resto é ignorado e avisado
 LIMITE_FONTES = 64
 EXTENSOES = {".md", ".txt"}
+RELATORIO_ROBO = "_ultimo_relatorio.txt"  # resultado do robô; não entra na base
 PENDENTE = "[DEFINIR"
 # Textos de ajuda do modelo (ia/instrucoes.md). Linha [DEFINIR] ainda igual ao modelo = não preenchida.
 AJUDAS = {
@@ -59,7 +60,7 @@ def decodificar(dados: bytes) -> str:
     como_utf8 = dados.decode("utf-8-sig", errors="replace")
     estranhos = como_utf8.count("\ufffd")
     acentuados = sum(1 for c in como_utf8 if ord(c) > 127 and c != "\ufffd")
-    if estranhos <= max(2, acentuados // 10):
+    if acentuados and estranhos <= max(2, acentuados // 10):
         return como_utf8
     return dados.decode("cp1252", errors="replace")
 
@@ -120,7 +121,7 @@ def documentos() -> tuple[str, list[str]]:
         if (
             arquivo.suffix.lower() not in EXTENSOES
             or arquivo.name.upper().startswith("LEIA-ME")
-            or arquivo.name.startswith("_")
+            or arquivo.name == RELATORIO_ROBO
         ):
             continue
         conteudo = ler(arquivo).strip()
@@ -143,18 +144,30 @@ def documentos() -> tuple[str, list[str]]:
     return texto, fora
 
 
+def _candidato(token: str) -> str:
+    """Transforma um pedaço da linha (endereço, site entre parênteses...) no nome do site."""
+    host = re.sub(r"^[a-z][a-z0-9+.-]*://", "", token.lower().strip("()[]<>\"',;"))
+    host = re.split(r"[/?#]", host)[0]
+    return host.rsplit("@", 1)[-1].split(":")[0].removeprefix("*.").strip(".")
+
+
 def _host(linha: str) -> str:
-    """Extrai o site de uma linha. Aceita endereço completo, marcador de lista ("- ", "1.")
-    e rótulo antes ("Planalto: ..."), e ignora notas depois de #."""
+    """Acha o site numa linha: aceita endereço completo, marcador de lista ("- ", "1.", "a)"),
+    rótulo antes ("Receita Federal: ...", "Planalto - ...") e notas depois de #."""
     partes = linha.split("#")[0].split()
-    while partes and (re.fullmatch(r"[-*•·>]+|\d+[.)]", partes[0]) or partes[0].endswith(":")):
+    while partes and re.fullmatch(r"[-*•·>–—]+|\d+[.)]|[a-z][.)]", partes[0]):
         partes.pop(0)
     if not partes:
         return ""
-    host = re.sub(r"^[a-z][a-z0-9+.-]*://", "", partes[0].lower())
-    host = re.split(r"[/?#]", host)[0]
-    host = host.rsplit("@", 1)[-1].split(":")[0].removeprefix("*.").strip(".")
-    return host
+    for token in partes:
+        if token.endswith(":") and "://" not in token:
+            continue  # rótulo, ex.: "Federal:"
+        pedacos = [token] if "://" in token else [token, *token.split(":")[1:]]
+        for pedaco in pedacos:
+            host = _candidato(pedaco)
+            if _valido(host):
+                return host
+    return _candidato(partes[0])  # nenhum site válido: a linha é recusada e mostrada como está
 
 
 def _valido(host: str) -> bool:
@@ -223,9 +236,6 @@ def aviso_fontes() -> str:
     if recusados:
         return f"Algumas linhas de ia/fontes.txt não são um site válido e foram ignoradas: {' | '.join(recusados)}"
     return ""
-
-
-RELATORIO_ROBO = "_ultimo_relatorio.txt"
 
 
 def _ultimo_relatorio() -> str:

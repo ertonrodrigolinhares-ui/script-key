@@ -16,11 +16,11 @@ Falta só a **definição** (qual área, para quem, com quais documentos), que f
 
 Tudo fica na pasta **`ia/`**. Edite os arquivos com o Bloco de Notas. As mudanças valem a partir da
 próxima conversa (botão **Nova conversa**). Em **⚙ Configurar** aparece um resumo da pasta e os avisos
-(itens ainda sem preencher, sites recusados, documentos grandes demais).
+(itens ainda sem preencher, sites recusados, documentos grandes demais, resultado do robô).
 
 | Fase | Onde | O que fazer |
 |---|---|---|
-| **1. Definição** e **2. Personalidade** | `ia/instrucoes.md` | Troque cada linha que começa com `[DEFINIR]` pelo seu texto (apague o `[DEFINIR]`): especialidade, público, o que responde, o que não pode fazer, quando encaminhar para um humano, formato da resposta. Linhas que ainda têm `[DEFINIR]` são ignoradas |
+| **1. Definição** e **2. Personalidade** | `ia/instrucoes.md` | Troque cada linha que começa com `[DEFINIR]` pelo seu texto (apague o `[DEFINIR]`): especialidade, público, o que responde, o que não pode fazer, quando encaminhar para um humano, formato da resposta. Linhas `[DEFINIR]` que continuam iguais ao modelo são ignoradas; se você escrever o seu texto numa linha `[DEFINIR]`, ele passa a valer (a marca é retirada) |
 | **3. Base de conhecimento** | `ia/conhecimento/` | Coloque leis, manuais, perguntas frequentes e tabelas em `.txt` ou `.md` (PDF: copie o texto e salve como `.txt`) |
 | **4. Sempre atual** | `ia/fontes.txt` e `ia/atualizar.txt` | Em `fontes.txt`, os sites oficiais onde a IA pode pesquisar (se nenhuma linha for um site válido, a pesquisa na web fica desligada e a tela avisa). Em `atualizar.txt`, as páginas e feeds RSS que o robô baixa para a base quando você roda **`Atualizar Base`**; o resultado da última execução aparece em **⚙ Configurar** |
 | **5. Canal** | — | Começa nesta tela de chat, no seu computador. Site ou WhatsApp vêm depois |

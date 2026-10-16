@@ -2,9 +2,10 @@
   FASES 1 e 2: DEFINIÇÃO E PERSONALIDADE
   Este arquivo é o texto que diz à IA quem ela é e como responde.
 
-  Como preencher: troque cada linha que começa com [DEFINIR] pelo seu texto,
-  apagando o [DEFINIR] e a explicação. Linhas que ainda têm [DEFINIR] são
-  ignoradas (a IA não vê). Blocos de anotação como este também são ignorados.
+  Como preencher: troque cada linha que começa com [DEFINIR] pelo seu texto.
+  Linhas [DEFINIR] que continuam iguais ao modelo são ignoradas (a IA não vê).
+  Se você escrever na própria linha [DEFINIR], o texto passa a valer e a marca
+  é retirada. Para anotações que a IA não deve ver, use um bloco como este.
   As mudanças valem a partir da próxima conversa (botão "Nova conversa").
 -->
 
