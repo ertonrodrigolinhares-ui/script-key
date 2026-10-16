@@ -14,21 +14,33 @@ Falta só a **definição** (qual área, para quem, com quais documentos), que f
 
 ## Como definir a sua IA (as 6 fases)
 
-Tudo fica na pasta **`ia/`**. Edite os arquivos com o Bloco de Notas; vale na próxima pergunta.
+Tudo fica na pasta **`ia/`**. Edite os arquivos com o Bloco de Notas. As mudanças valem a partir da
+próxima conversa (botão **Nova conversa**). Em **⚙ Configurar** aparece um resumo da pasta e os avisos
+(itens ainda sem preencher, sites recusados, documentos grandes demais).
 
 | Fase | Onde | O que fazer |
 |---|---|---|
-| **1. Definição** e **2. Personalidade** | `ia/instrucoes.md` | Preencha os trechos marcados com `[DEFINIR]`: especialidade, público, o que responde, o que não pode fazer, quando encaminhar para um humano, formato da resposta |
+| **1. Definição** e **2. Personalidade** | `ia/instrucoes.md` | Troque cada linha que começa com `[DEFINIR]` pelo seu texto (apague o `[DEFINIR]`): especialidade, público, o que responde, o que não pode fazer, quando encaminhar para um humano, formato da resposta. Linhas que ainda têm `[DEFINIR]` são ignoradas |
 | **3. Base de conhecimento** | `ia/conhecimento/` | Coloque leis, manuais, perguntas frequentes e tabelas em `.txt` ou `.md` (PDF: copie o texto e salve como `.txt`) |
 | **4. Sempre atual** | `ia/fontes.txt` e `ia/atualizar.txt` | Em `fontes.txt`, os sites oficiais onde a IA pode pesquisar. Em `atualizar.txt`, as páginas que o robô baixa para a base quando você roda **`Atualizar Base`** |
 | **5. Canal** | — | Começa nesta tela de chat, no seu computador. Site ou WhatsApp vêm depois |
 | **6. Teste** | `ia/perguntas_teste.json` | Escreva ~30 perguntas reais com a resposta certa e rode **`Testar IA`**. O resultado sai em `ia/resultado_teste.md`, com o que acertou e o que errou |
 
-**Robô da madrugada:** para atualizar a base sozinho todo dia, abra o **Agendador de Tarefas**
-do Windows → *Criar Tarefa Básica* → *Diariamente*, às 3h → *Iniciar um programa* → escolha o
-`Atualizar Base.bat` desta pasta.
+**Atualização automática:** abra o **Agendador de Tarefas** do Windows → *Criar Tarefa Básica* →
+*Diariamente*, num horário em que o computador costuma estar ligado (ex.: 12h) → *Iniciar um programa* →
+escolha o `Atualizar Base.bat` desta pasta e, em *Adicionar argumentos*, escreva `/agendado`
+(assim a janela fecha sozinha no fim). Na última tela, marque *Abrir a caixa de diálogo Propriedades*
+e, na janela que abrir:
+- aba **Configurações**: marque *Executar a tarefa assim que possível após uma inicialização agendada ser perdida*
+  (se o PC estiver desligado no horário, a atualização roda quando você ligá-lo);
+- aba **Condições** (notebook): desmarque *Iniciar a tarefa somente se o computador estiver ligado na energia CA*.
+
+O robô só guarda páginas de texto. PDF e Word ele ignora e avisa: abra o arquivo, copie o texto e
+salve como `.txt` em `ia/conhecimento/`.
 
 > O **Testar IA** gasta créditos da Anthropic: duas chamadas por pergunta (a resposta e a correção).
+> Cada pergunta roda numa conversa nova, com memória vazia: o teste não mexe na memória real.
+> Apague as perguntas de EXEMPLO antes de testar.
 
 ## Instalação no Windows
 

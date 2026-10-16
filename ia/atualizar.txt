@@ -1,6 +1,6 @@
 # FASE 4 — ROBÔ DE ATUALIZAÇÃO
 # Páginas que o robô baixa e guarda em ia/conhecimento/atualizacoes/ cada vez que roda
-# (dois cliques em "Atualizar Base", ou agendado no Windows para toda madrugada).
+# (dois cliques em "Atualizar Base", ou agendado no Windows para rodar todo dia).
 # Formato: nome-curto | endereço
 # Ex.:
 #   noticias-receita | https://www.gov.br/receitafederal/pt-br/assuntos/noticias

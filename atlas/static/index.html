@@ -226,16 +226,33 @@ $("nova").addEventListener("click", () => {
   adicionar("status", "Nova conversa iniciada.");
 });
 
+async function lerEstado() {
+  try {
+    const r = await fetch("/api/estado");
+    if (r.ok) return await r.json();
+  } catch (e) { /* servidor fora do ar: mostra a tela mesmo assim */ }
+  return null;
+}
+
 async function abrirConfig() {
-  const r = await fetch("/api/estado");
-  const estado = await r.json();
-  $("chave-aviso").textContent = estado.tem_chave ? "Chave já configurada. Cole outra só se quiser trocar." : "Nenhuma chave configurada ainda.";
+  const estado = (await lerEstado()) || { tem_chave: false, memoria: [], pasta: "?", ia: null, falhou: true };
+  $("chave-aviso").textContent = estado.falhou
+    ? "Não consegui falar com o servidor do Atlas. Você ainda pode salvar a chave."
+    : estado.tem_chave ? "Chave já configurada. Cole outra só se quiser trocar." : "Nenhuma chave configurada ainda.";
   $("pasta").textContent = estado.pasta;
   const ia = estado.ia;
-  $("ia-resumo").textContent =
-    `Pasta: ${ia.pasta} · Documentos na base: ${ia.documentos}` +
-    (ia.documentos_fora.length ? ` (${ia.documentos_fora.length} grandes demais, ignorados)` : "") +
-    ` · Pesquisa na web: ${ia.fontes.length ? ia.fontes.join(", ") : "qualquer site"}`;
+  const avisos = [];
+  if (ia) {
+    if (ia.erro) avisos.push(ia.erro);
+    if (ia.pendentes) avisos.push(`${ia.pendentes} item(ns) [DEFINIR] ainda sem preencher em instrucoes.md`);
+    if (ia.documentos_fora.length) avisos.push(`${ia.documentos_fora.length} documento(s) grandes demais, ignorados: ${ia.documentos_fora.join(", ")}`);
+    if (ia.fontes_recusadas.length) avisos.push(`linhas de fontes.txt ignoradas (não são um site válido): ${ia.fontes_recusadas.join(" | ")}`);
+  }
+  $("ia-resumo").textContent = ia
+    ? `Pasta: ${ia.pasta} · Documentos na base: ${ia.documentos} · Pesquisa na web: ${ia.fontes.length ? ia.fontes.join(", ") : "qualquer site"}` +
+      (avisos.length ? " · ⚠ " + avisos.join(" · ⚠ ") : "") +
+      " · Mudanças na pasta valem na próxima conversa (Nova conversa)."
+    : "";
   const lista = $("lista-memoria");
   lista.innerHTML = "";
   if (!estado.memoria.length) lista.innerHTML = "<li class='status'>Nada guardado ainda.</li>";
@@ -267,7 +284,7 @@ $("salvar-chave").addEventListener("click", async () => {
   else { const d = await r.json(); $("chave-aviso").textContent = d.detail || "Chave inválida."; }
 });
 
-fetch("/api/estado").then((r) => r.json()).then((e) => { if (!e.tem_chave) abrirConfig(); });
+lerEstado().then((e) => { if (!e || !e.tem_chave) abrirConfig(); });
 </script>
 </body>
 </html>

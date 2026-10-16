@@ -532,12 +532,12 @@ def test_instrucoes_documentos_e_fontes_da_pasta_ia():
     (pasta / "conhecimento" / "lei.txt").write_text("Art. 1º Regra.", encoding="utf-8")
     (pasta / "conhecimento" / "LEIA-ME.txt").write_text("não vai", encoding="utf-8")
     (pasta / "conhecimento" / "foto.png").write_bytes(b"x")
-    (pasta / "fontes.txt").write_text("# comentário\nhttps://www.planalto.gov.br/x\ngov.br\n", encoding="utf-8")
+    (pasta / "fontes.txt").write_text("# comentário\nhttps://www.planalto.gov.br/x\nwww.gov.br\n", encoding="utf-8")
     blocos = especialidade.sistema()
     assert blocos[0] == {"type": "text", "text": "Você é especialista em X."}
     assert '<documento nome="lei.txt">' in blocos[1]["text"] and "não vai" not in blocos[1]["text"]
     assert blocos[1]["cache_control"] == {"type": "ephemeral"}
-    assert especialidade.pesquisa_web()["allowed_domains"] == ["www.planalto.gov.br", "gov.br"]
+    assert especialidade.pesquisa_web()["allowed_domains"] == ["www.planalto.gov.br", "www.gov.br"]
     assert especialidade.resumo()["documentos"] == 1
 
 
@@ -557,12 +557,12 @@ def test_cerebro_usa_a_definicao_da_ia():
 
     pasta = _ia()
     (pasta / "instrucoes.md").write_text("Você é o Bot X.", encoding="utf-8")
-    (pasta / "fontes.txt").write_text("gov.br", encoding="utf-8")
+    (pasta / "fontes.txt").write_text("www.gov.br", encoding="utf-8")
     cliente = ClienteFalso([_texto("Oi.")])
     list(Conversa(cliente).responder("Oi"))
     chamada = cliente.chamadas[0]
     assert chamada["system"][0]["text"] == "Você é o Bot X."
-    assert chamada["tools"][0]["allowed_domains"] == ["gov.br"]
+    assert chamada["tools"][0]["allowed_domains"] == ["www.gov.br"]
     assert [t["name"] for t in chamada["tools"]] == ["web_search", "guardar_memoria", "esquecer_memoria"]
 
 
@@ -606,3 +606,196 @@ def test_teste_com_perguntas_reais_gera_relatorio():
     assert resumo.startswith("Acertos: 1 de 2")
     relatorio = (pasta / "resultado_teste.md").read_text(encoding="utf-8")
     assert "✅ CERTO" in relatorio and "❌ ERRADO" in relatorio and "Vence dia 10." in relatorio
+
+
+# ---------- revisão da carcaça ----------
+
+def test_arquivos_salvos_em_ansi_ou_utf16_sao_lidos_certo():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "instrucoes.md").write_bytes("Você é especialista em legislação.".encode("cp1252"))
+    (pasta / "conhecimento" / "lei.txt").write_bytes("Art. 1º A alíquota é de 12% (§ 2º).".encode("cp1252"))
+    (pasta / "conhecimento" / "tabela.txt").write_text("Produto\tAlíquota", encoding="utf-16")
+    (pasta / "fontes.txt").write_bytes("# Fontes (legislação)\nwww.gov.br".encode("cp1252"))
+    assert especialidade.instrucoes() == "Você é especialista em legislação."
+    texto, _ = especialidade.documentos()
+    assert "Art. 1º A alíquota é de 12% (§ 2º)." in texto and "Produto\tAlíquota" in texto
+    assert especialidade.dominios() == ["www.gov.br"]
+
+
+def test_linhas_definir_sao_ignoradas_ate_serem_preenchidas():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "instrucoes.md").write_text(
+        "<!-- nota -->\nVocê é o Atlas.\n[DEFINIR] Especialidade: ...\nVocê é especialista em Simples Nacional.\n",
+        encoding="utf-8",
+    )
+    texto = especialidade.instrucoes()
+    assert "DEFINIR" not in texto and "Simples Nacional" in texto
+    assert especialidade.pendentes() == 1
+
+
+def test_modelo_de_instrucoes_do_repositorio_funciona(monkeypatch):
+    from pathlib import Path
+
+    from atlas import especialidade
+
+    monkeypatch.setenv("ATLAS_IA", str(Path(__file__).resolve().parent.parent / "ia"))
+    texto = especialidade.instrucoes()
+    assert texto.startswith("Você é o Atlas") and "DEFINIR" not in texto and "<!--" not in texto
+    assert especialidade.pendentes() == 6
+    assert especialidade.dominios() == []
+
+
+def test_fontes_invalidas_sao_ignoradas_e_avisadas():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "fontes.txt").write_text(
+        "gov.br\njus.br\nhttps://www.planalto.gov.br/ccivil_03/a.htm\nhttps://www.planalto.gov.br/b\n"
+        "planalto.gov.br  # leis federais\nlocalhost:8000\n192.168.0.1\nstf.jus.br:443/x\n",
+        encoding="utf-8",
+    )
+    aceitos, recusados = especialidade.fontes()
+    assert aceitos == ["www.planalto.gov.br", "planalto.gov.br", "stf.jus.br"]
+    assert recusados == ["gov.br", "jus.br", "localhost:8000", "192.168.0.1"]
+    assert especialidade.resumo()["fontes_recusadas"] == recusados
+
+
+def test_definicao_fica_fixa_durante_a_conversa():
+    from atlas.cerebro import Conversa
+
+    pasta = _ia()
+    (pasta / "instrucoes.md").write_text("Versão 1.", encoding="utf-8")
+    cliente = ClienteFalso([_texto("a"), _texto("b"), _texto("c")])
+    conversa = Conversa(cliente)
+    list(conversa.responder("Oi"))
+    (pasta / "instrucoes.md").write_text("Versão 2.", encoding="utf-8")
+    list(conversa.responder("De novo"))
+    assert [c["system"][0]["text"] for c in cliente.chamadas] == ["Versão 1.", "Versão 1."]
+    nova = Conversa(cliente)
+    list(nova.responder("Oi"))
+    assert cliente.chamadas[-1]["system"][0]["text"] == "Versão 2."
+
+
+def test_pasta_ia_ilegivel_da_mensagem_clara(monkeypatch):
+    from atlas import especialidade
+    from atlas.cerebro import Conversa
+
+    def quebra():
+        raise PermissionError("acesso negado")
+
+    monkeypatch.setattr(especialidade, "sistema", quebra)
+    conversa = Conversa(ClienteFalso([]))
+    eventos = list(conversa.responder("Oi"))
+    assert eventos == [{"tipo": "erro", "texto": "Não consegui ler a pasta ia/ (definição da IA): acesso negado"}]
+    assert conversa.mensagens == []
+
+
+def test_estado_responde_mesmo_com_pasta_ia_quebrada(monkeypatch):
+    from atlas import especialidade
+
+    def quebra():
+        raise PermissionError("acesso negado")
+
+    monkeypatch.setattr(especialidade, "documentos", quebra)
+    resposta = _web().get("/api/estado")
+    assert resposta.status_code == 200 and "acesso negado" in resposta.json()["ia"]["erro"]
+
+
+def test_erro_de_site_recusado_pelo_claude_explica_o_que_fazer():
+    from atlas.cerebro import _mensagem_erro_api
+
+    resposta = httpx2.Response(400, request=httpx2.Request("POST", "https://api.anthropic.com"))
+    erro = anthropic.BadRequestError("x", response=resposta, body={"error": {
+        "type": "invalid_request_error", "message": "tools.0.allowed_domains: 'co.uk' is a public suffix"}})
+    assert "ia/fontes.txt" in _mensagem_erro_api(erro)
+
+
+def _robo(pasta, rota):
+    from atlas import atualizar
+
+    return atualizar.atualizar(httpx2.Client(transport=httpx2.MockTransport(rota)))
+
+
+def test_robo_ignora_pdf_e_avisa():
+    pasta = _ia()
+    (pasta / "atualizar.txt").write_text("lei | https://exemplo.gov.br/lei.pdf\n", encoding="utf-8")
+    relatorio = _robo(pasta, lambda r: httpx2.Response(200, content=b"%PDF-1.7 ...", headers={"Content-Type": "application/pdf"}))
+    assert relatorio[0].startswith("IGNORADO") and "PDF" in relatorio[0]
+    assert not (pasta / "conhecimento" / "atualizacoes" / "lei.md").exists()
+
+
+def test_robo_mantem_acentos_de_pagina_antiga_em_windows_1252():
+    pasta = _ia()
+    (pasta / "atualizar.txt").write_text("lei | https://www.planalto.gov.br/lei.htm\n", encoding="utf-8")
+    html = '<html><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><p>contribuição § 1º</p></html>'
+    _robo(pasta, lambda r: httpx2.Response(200, content=html.encode("cp1252"), headers={"Content-Type": "text/html"}))
+    salvo = (pasta / "conhecimento" / "atualizacoes" / "lei.md").read_text(encoding="utf-8")
+    assert "contribuição § 1º" in salvo
+
+
+def test_robo_avisa_pagina_cortada(monkeypatch):
+    from atlas import atualizar
+
+    pasta = _ia()
+    monkeypatch.setattr(atualizar, "LIMITE_POR_PAGINA", 10)
+    (pasta / "atualizar.txt").write_text("grande | https://exemplo.gov.br/g\n", encoding="utf-8")
+    relatorio = _robo(pasta, lambda r: httpx2.Response(200, text="x" * 50))
+    assert "guardei só o começo" in relatorio[0]
+    assert "página cortada" in (pasta / "conhecimento" / "atualizacoes" / "grande.md").read_text(encoding="utf-8")
+
+
+def test_teste_nao_mexe_na_memoria_real():
+    import json
+
+    from atlas import avaliar, memoria
+
+    memoria.guardar("Fato real do usuário")
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text(json.dumps([
+        {"pergunta": "Sou MEI", "resposta_esperada": "Ok."},
+        {"pergunta": "E agora?", "resposta_esperada": "Ok."},
+    ]), encoding="utf-8")
+    cliente = ClienteFalso([_uso_memoria("O usuário é MEI"), _texto("Ok."), _texto("Ok.")])
+    cliente.messages = SimpleNamespace(create=lambda **kw: SimpleNamespace(
+        stop_reason="end_turn", content=[SimpleNamespace(type="text", text="CERTO\nok")]))
+    avaliar.avaliar(cliente)
+    assert [f["fato"] for f in memoria.listar()] == ["Fato real do usuário"]
+    assert "(memória vazia)" in cliente.chamadas[-1]["messages"][0]["content"]
+
+
+def test_falha_do_avaliador_nao_para_o_teste():
+    import json
+
+    from atlas import avaliar
+
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text(json.dumps([
+        {"pergunta": "A?", "resposta_esperada": "a"}, {"pergunta": "B?", "resposta_esperada": "b"},
+        {"pergunta": "sem resposta esperada"},
+    ]), encoding="utf-8")
+    cliente = ClienteFalso([_texto("a"), _texto("b")])
+    chamadas = iter([anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x")), None])
+
+    def julgar(**kw):
+        erro = next(chamadas)
+        if erro:
+            raise erro
+        return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="CERTO\nok")])
+
+    cliente.messages = SimpleNamespace(create=julgar)
+    resumo = avaliar.avaliar(cliente)
+    assert resumo.startswith("Acertos: 1 de 1, 1 não avaliada(s), 1 ignorada(s)")
+    assert "⚠️ NÃO AVALIADO" in (pasta / "resultado_teste.md").read_text(encoding="utf-8")
+
+
+def test_erro_de_digitacao_no_json_explica_onde():
+    from atlas import avaliar
+
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text('[{"pergunta": "A?" "resposta_esperada": "a"}]', encoding="utf-8")
+    resumo = avaliar.avaliar(ClienteFalso([]))
+    assert "linha 1" in resumo and "Confira aspas" in resumo

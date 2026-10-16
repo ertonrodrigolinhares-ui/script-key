@@ -3,7 +3,8 @@
     python -m atlas.atualizar
 
 Cada página vira um .md em ia/conhecimento/atualizacoes/, com a data da coleta.
-Para rodar toda madrugada, agende o "Atualizar Base.bat" no Agendador de Tarefas do Windows.
+Para rodar todo dia, agende o "Atualizar Base.bat /agendado" no Agendador de Tarefas do Windows
+(veja o README).
 """
 
 import re
@@ -63,6 +64,26 @@ def paginas() -> list[tuple[str, str]]:
     return lista
 
 
+TIPOS_TEXTO = ("text/", "application/xhtml", "application/xml", "application/json")
+
+
+def _e_texto(resposta: httpx2.Response) -> bool:
+    """Só páginas de texto entram na base; PDF, Word, imagens etc. ficam de fora."""
+    tipo = resposta.headers.get("content-type", "").split(";")[0].strip().lower()
+    if tipo:
+        return tipo.startswith(TIPOS_TEXTO)
+    return b"\x00" not in resposta.content[:2048] and not resposta.content.startswith(b"%PDF")
+
+
+def _texto_da_resposta(resposta: httpx2.Response) -> str:
+    if resposta.charset_encoding:  # o servidor disse o charset no cabeçalho
+        return resposta.text
+    try:
+        return resposta.content.decode("utf-8-sig")
+    except UnicodeDecodeError:  # páginas antigas (ex.: leis geradas no Word) em windows-1252
+        return resposta.content.decode("cp1252", errors="replace")
+
+
 def atualizar(cliente: httpx2.Client | None = None) -> list[str]:
     """Baixa cada página e devolve um relatório (uma linha por página)."""
     destino = pasta_ia() / "conhecimento" / "atualizacoes"
@@ -76,14 +97,29 @@ def atualizar(cliente: httpx2.Client | None = None) -> list[str]:
         except httpx2.HTTPError as e:
             relatorio.append(f"FALHOU  {nome}: {e}")
             continue
+        if not _e_texto(resposta):
+            tipo = resposta.headers.get("content-type", "desconhecido")
+            relatorio.append(
+                f"IGNORADO {nome}: não é uma página de texto ({tipo}). Se for PDF, abra, copie o "
+                "texto e salve como .txt em ia/conhecimento."
+            )
+            continue
+        bruto = _texto_da_resposta(resposta)
         tipo = resposta.headers.get("content-type", "")
-        texto = html_para_texto(resposta.text) if "html" in tipo or "<html" in resposta.text[:500].lower() else resposta.text
-        texto = texto[:LIMITE_POR_PAGINA]
+        texto = html_para_texto(bruto) if "html" in tipo or "<html" in bruto[:500].lower() else bruto
+        aviso = ""
+        if len(texto) > LIMITE_POR_PAGINA:
+            texto = texto[:LIMITE_POR_PAGINA] + "\n\n[... página cortada: o resto não foi guardado ...]"
+            aviso = " (página grande: guardei só o começo)"
         agora = datetime.now().strftime("%d/%m/%Y %H:%M")
-        (destino / f"{nome}.md").write_text(
-            f"# {nome}\nFonte: {url}\nColetado em: {agora}\n\n{texto}\n", encoding="utf-8"
-        )
-        relatorio.append(f"OK      {nome}: {len(texto):,} caracteres".replace(",", "."))
+        try:
+            (destino / f"{nome}.md").write_text(
+                f"# {nome}\nFonte: {url}\nColetado em: {agora}\n\n{texto}\n", encoding="utf-8"
+            )
+        except OSError as e:
+            relatorio.append(f"FALHOU  {nome}: não consegui gravar o arquivo ({e})")
+            continue
+        relatorio.append(f"OK      {nome}: {len(texto):,} caracteres{aviso}".replace(",", "."))
     if not relatorio:
         relatorio.append("Nenhuma página em ia/atualizar.txt. Nada a fazer.")
     return relatorio

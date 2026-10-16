@@ -1,6 +1,7 @@
 # FASE 3/4 — FONTES DA PESQUISA NA WEB
-# Um site por linha (só o domínio, sem https://). Ex.:
-#   planalto.gov.br
-#   gov.br
+# Um site por linha. Pode colar o endereço completo; só o site é usado. Ex.:
+#   www.planalto.gov.br
+#   www.gov.br
+# Não use só "gov.br", "jus.br" ou "com.br": o Claude não aceita. Ponha o site (ex.: stf.jus.br).
 # Com a lista vazia, a IA pesquisa em qualquer site.
 # Com sites listados, ela pesquisa SÓ neles. Poucas fontes boas valem mais que muitas ruins.

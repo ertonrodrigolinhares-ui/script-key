@@ -108,6 +108,10 @@ def _mensagem_erro_api(e: anthropic.APIStatusError) -> str:
         return "O Claude está sobrecarregado agora. Tente de novo em instantes."
     if e.status_code == 413 or "prompt is too long" in detalhe:
         return CONVERSA_LONGA
+    if "allowed_domains" in detalhe:
+        return f"Um site de ia/fontes.txt não foi aceito pelo Claude: {detalhe}. Corrija essa linha e clique em Nova conversa."
+    if "bound to a different conversation" in detalhe:
+        return "A definição da IA mudou durante esta conversa. Clique em Nova conversa."
     if detalhe:  # ex.: créditos acabaram; tentar de novo não resolveria
         return f"O Claude recusou o pedido (erro {e.status_code}): {detalhe}"
     return f"O Claude respondeu com erro {e.status_code}. Tente de novo."
@@ -127,6 +131,7 @@ class Conversa:
     def __init__(self, cliente: anthropic.Anthropic | None = None):
         self._cliente = cliente
         self.mensagens: list[dict] = []
+        self._definicao: tuple[list[dict], list[dict]] | None = None  # (system, ferramentas)
 
     def trocar_chave(self) -> None:
         """A próxima pergunta cria o cliente de novo, com a chave atual."""
@@ -146,6 +151,18 @@ class Conversa:
         except RuntimeError:
             yield {"tipo": "erro", "texto": "Falta a chave da Anthropic. Clique em ⚙ Configurar."}
             return
+
+        if not self.mensagens or self._definicao is None:
+            # A definição da IA (pasta ia/) vale para a conversa inteira: mudar o system
+            # ou as ferramentas no meio invalidaria o raciocínio já guardado no histórico.
+            try:
+                self._definicao = (
+                    especialidade.sistema(),
+                    [especialidade.pesquisa_web(), *FERRAMENTAS_MEMORIA],
+                )
+            except (OSError, ValueError) as e:
+                yield {"tipo": "erro", "texto": f"Não consegui ler a pasta ia/ (definição da IA): {e}"}
+                return
 
         inicio = len(self.mensagens)
         mostrado = ""  # tudo o que esta pergunta já pôs na tela
@@ -170,6 +187,7 @@ class Conversa:
             raise
 
     def _voltas(self, cliente: anthropic.Anthropic) -> Iterator[dict]:
+        sistema, ferramentas = self._definicao
         voltas = 0
         json_invalido = 0
         texto_anterior = ""
@@ -181,9 +199,9 @@ class Conversa:
                     max_tokens=64000,
                     betas=BETAS,
                     fallbacks="default",
-                    system=especialidade.sistema(),
+                    system=sistema,
                     output_config={"effort": ESFORCO},
-                    tools=[especialidade.pesquisa_web(), *FERRAMENTAS_MEMORIA],
+                    tools=ferramentas,
                     messages=self.mensagens,
                 ) as fluxo:
                     for evento in fluxo:
