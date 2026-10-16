@@ -5,3 +5,4 @@ __pycache__/
 config.env
 .pytest_cache/
 ia/resultado_teste.md
+ia/conhecimento/atualizacoes/_ultimo_relatorio.txt

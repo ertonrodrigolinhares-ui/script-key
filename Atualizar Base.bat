@@ -9,4 +9,7 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 ".venv\Scripts\python.exe" -m atlas.atualizar
+set "CODIGO=%errorlevel%"
 if /i not "%~1"=="/agendado" pause
+rem Codigo 1 = alguma pagina falhou (aparece no Agendador e em Configurar).
+exit /b %CODIGO%

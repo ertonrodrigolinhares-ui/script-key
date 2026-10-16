@@ -5,6 +5,7 @@
     {"tipo": "descartar", "texto": "..."}  apagar da tela um pedaço que não vale mais
     {"tipo": "status", "texto": "..."}     ex.: "Pesquisando na web..."
     {"tipo": "memoria", "texto": "..."}    confirmação de algo guardado ou esquecido
+    {"tipo": "aviso", "texto": "..."}      aviso sobre a definição da IA (ex.: fontes.txt)
     {"tipo": "erro", "texto": "..."}       algo deu errado
 
 Regra de ouro: o histórico enviado ao Claude precisa estar sempre válido. Se uma
@@ -156,13 +157,17 @@ class Conversa:
             # A definição da IA (pasta ia/) vale para a conversa inteira: mudar o system
             # ou as ferramentas no meio invalidaria o raciocínio já guardado no histórico.
             try:
+                web = especialidade.pesquisa_web()
                 self._definicao = (
                     especialidade.sistema(),
-                    [especialidade.pesquisa_web(), *FERRAMENTAS_MEMORIA],
+                    [*([web] if web else []), *FERRAMENTAS_MEMORIA],
                 )
+                aviso = especialidade.aviso_fontes()
             except (OSError, ValueError) as e:
                 yield {"tipo": "erro", "texto": f"Não consegui ler a pasta ia/ (definição da IA): {e}"}
                 return
+            if aviso:
+                yield {"tipo": "aviso", "texto": aviso}
 
         inicio = len(self.mensagens)
         mostrado = ""  # tudo o que esta pergunta já pôs na tela

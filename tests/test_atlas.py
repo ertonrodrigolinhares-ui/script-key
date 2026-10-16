@@ -629,11 +629,13 @@ def test_linhas_definir_sao_ignoradas_ate_serem_preenchidas():
 
     pasta = _ia()
     (pasta / "instrucoes.md").write_text(
-        "<!-- nota -->\nVocê é o Atlas.\n[DEFINIR] Especialidade: ...\nVocê é especialista em Simples Nacional.\n",
+        "<!-- nota -->\nVocê é o Atlas.\n"
+        "[DEFINIR] Especialidade: escreva aqui qual problema a IA resolve. Ex.: Você é especialista em ...\n"
+        "[DEFINIR] Público: Você atende contadores.\n",
         encoding="utf-8",
     )
     texto = especialidade.instrucoes()
-    assert "DEFINIR" not in texto and "Simples Nacional" in texto
+    assert texto == "Você é o Atlas.\nPúblico: Você atende contadores."
     assert especialidade.pendentes() == 1
 
 
@@ -799,3 +801,99 @@ def test_erro_de_digitacao_no_json_explica_onde():
     (pasta / "perguntas_teste.json").write_text('[{"pergunta": "A?" "resposta_esperada": "a"}]', encoding="utf-8")
     resumo = avaliar.avaliar(ClienteFalso([]))
     assert "linha 1" in resumo and "Confira aspas" in resumo
+
+
+# ---------- conferência final ----------
+
+def test_texto_utf8_com_um_byte_estranho_mantem_os_acentos():
+    from atlas.especialidade import decodificar
+
+    dados = "Art. 1º A contribuição é de 12%; alíquota § 2º. ".encode("utf-8") * 5 + b"caf\xe9"
+    texto = decodificar(dados)
+    assert "contribuição" in texto and "Ã" not in texto
+
+
+def test_fontes_sem_nenhum_site_valido_desligam_a_pesquisa_e_avisam():
+    from atlas import especialidade
+    from atlas.cerebro import Conversa
+
+    pasta = _ia()
+    (pasta / "fontes.txt").write_text("gov.br\njus.br\n", encoding="utf-8")
+    assert especialidade.pesquisa_web() is None
+    cliente = ClienteFalso([_texto("Oi.")])
+    eventos = list(Conversa(cliente).responder("Oi"))
+    assert eventos[0]["tipo"] == "aviso" and "desligada" in eventos[0]["texto"]
+    assert [t["name"] for t in cliente.chamadas[0]["tools"]] == ["guardar_memoria", "esquecer_memoria"]
+    assert especialidade.resumo()["pesquisa_desligada"] is True
+
+
+def test_fontes_em_lista_com_marcadores_e_rotulos():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "fontes.txt").write_text(
+        "- www.planalto.gov.br\n* stf.jus.br\n1. www.gov.br\nReceita: receita.fazenda.gov.br\n"
+        "sp.gov.br\nintranet.empresa.local\n127.1\n",
+        encoding="utf-8",
+    )
+    aceitos, recusados = especialidade.fontes()
+    assert aceitos == ["www.planalto.gov.br", "stf.jus.br", "www.gov.br", "receita.fazenda.gov.br"]
+    assert recusados == ["sp.gov.br", "intranet.empresa.local", "127.1"]
+
+
+def test_robo_aceita_feed_rss_e_respeita_meta_charset():
+    pasta = _ia()
+    (pasta / "atualizar.txt").write_text(
+        "feed | https://exemplo.gov.br/rss\npagina | https://exemplo.gov.br/p\n", encoding="utf-8")
+
+    def rota(pedido):
+        if pedido.url.path == "/rss":
+            return httpx2.Response(200, content="<rss><item>Nova regra</item></rss>".encode(),
+                                   headers={"Content-Type": "application/rss+xml"})
+        html = '<html><meta charset="utf-8"><p>contribuição alíquota</p><p>caf\xe9</p></html>'
+        corpo = html.encode("utf-8").replace("caf\xe9".encode("utf-8"), b"caf\xe9")
+        return httpx2.Response(200, content=corpo, headers={"Content-Type": "text/html"})
+
+    relatorio = _robo(pasta, rota)
+    assert relatorio[0].startswith("OK") and relatorio[1].startswith("OK")
+    pagina = (pasta / "conhecimento" / "atualizacoes" / "pagina.md").read_text(encoding="utf-8")
+    assert "contribuição alíquota" in pagina
+
+
+def test_relatorio_do_robo_fica_guardado_e_aparece_em_configurar():
+    from atlas import atualizar, especialidade
+
+    _ia()
+    atualizar.gravar_relatorio(["OK      a: 10 caracteres", "FALHOU  b: 404"])
+    assert "1 página(s) atualizada(s), 1 com falha" in especialidade.resumo()["robo"]
+    texto, _ = especialidade.documentos()
+    assert "_ultimo_relatorio" not in texto
+
+
+def test_falha_do_claude_ao_responder_nao_conta_como_erro():
+    import json
+
+    from atlas import avaliar
+
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text(json.dumps([
+        {"pergunta": "A?", "resposta_esperada": "a"},
+        {"pergunta": None, "resposta_esperada": "x"},
+        {"pergunta": "C?", "resposta_esperada": None},
+    ]), encoding="utf-8")
+    resposta = httpx2.Response(429, request=httpx2.Request("POST", "https://api.anthropic.com"))
+    cliente = ClienteFalso([anthropic.RateLimitError("limite", response=resposta, body=None)])
+    resumo = avaliar.avaliar(cliente)
+    assert resumo.startswith("Acertos: 0 de 0, 1 não avaliada(s), 2 ignorada(s)")
+
+
+def test_avaliador_com_veredito_e_motivo_na_mesma_linha_ou_cortado():
+    from atlas import avaliar
+
+    def cliente(texto, parada="end_turn"):
+        return SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: SimpleNamespace(
+            stop_reason=parada, content=[SimpleNamespace(type="text", text=texto)])))
+
+    assert avaliar.julgar(cliente("ERRADO — disse 10, esperado 31."), "p", "e", "r") == (False, "disse 10, esperado 31.")
+    assert avaliar.julgar(cliente("**CERTO**\nbateu"), "p", "e", "r") == (True, "bateu")
+    assert avaliar.julgar(cliente("ERRADO", "max_tokens"), "p", "e", "r")[0] is None

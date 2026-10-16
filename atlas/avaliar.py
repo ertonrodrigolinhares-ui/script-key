@@ -12,6 +12,7 @@ Atenção: gasta créditos da Anthropic (2 chamadas por pergunta).
 
 import json
 import os
+import re
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -50,10 +51,10 @@ def carregar_perguntas() -> tuple[list[dict], int]:
         ) from None
     if not isinstance(dados, list):
         raise PerguntasInvalidas("perguntas_teste.json precisa ser uma lista: [ {...}, {...} ].")
-    validas = [
-        p for p in dados
-        if isinstance(p, dict) and str(p.get("pergunta", "")).strip() and str(p.get("resposta_esperada", "")).strip()
-    ]
+    def preenchido(p: object, campo: str) -> bool:
+        return isinstance(p, dict) and isinstance(p.get(campo), str) and bool(p[campo].strip())
+
+    validas = [p for p in dados if preenchido(p, "pergunta") and preenchido(p, "resposta_esperada")]
     return validas, len(dados) - len(validas)
 
 
@@ -97,16 +98,17 @@ def julgar(cliente: anthropic.Anthropic, pergunta: str, esperada: str, resposta:
             f"PERGUNTA:\n{pergunta}\n\nRESPOSTA ESPERADA:\n{esperada}\n\nRESPOSTA:\n{resposta}"
         )}],
     )
-    if getattr(msg, "stop_reason", "end_turn") == "refusal":
+    parada = getattr(msg, "stop_reason", "end_turn")
+    if parada == "refusal":
         return None, "o avaliador recusou analisar esta pergunta"
+    if parada == "max_tokens":
+        return None, "a avaliação foi cortada antes de terminar"
     texto = "".join(b.text for b in msg.content if b.type == "text").strip()
-    primeira, _, motivo = texto.partition("\n")
-    veredito = primeira.strip().upper()
-    if veredito.startswith("CERTO"):
-        return True, motivo.strip()
-    if veredito.startswith("ERRADO"):
-        return False, motivo.strip()
-    return None, f"o avaliador não respondeu no formato esperado: {texto[:200]}"
+    achado = re.match(r"\W*(CERTO|ERRADO)\b[\s:.,;—–*_-]*(.*)", texto, re.I | re.S)
+    if not achado:
+        return None, f"o avaliador não respondeu no formato esperado: {texto[:200] or '(vazio)'}"
+    motivo = " ".join(achado.group(2).split()) or "(sem motivo)"
+    return achado.group(1).upper() == "CERTO", motivo
 
 
 def _gravar(cabecalho: str, linhas: list[str]) -> None:
@@ -133,7 +135,8 @@ def avaliar(cliente: anthropic.Anthropic | None = None) -> str:
         try:
             resposta = responder(p["pergunta"], cliente)
             if resposta.startswith("[ERRO]"):
-                nota, motivo = False, "a IA não respondeu"
+                # Falha do Claude (sobrecarga, limite, créditos) não é erro da IA: não conta na nota.
+                nota, motivo = None, resposta.removeprefix("[ERRO] ")
             else:
                 nota, motivo = julgar(cliente, p["pergunta"], p["resposta_esperada"], resposta)
         except anthropic.APIError as e:

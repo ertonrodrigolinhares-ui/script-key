@@ -22,7 +22,7 @@ próxima conversa (botão **Nova conversa**). Em **⚙ Configurar** aparece um r
 |---|---|---|
 | **1. Definição** e **2. Personalidade** | `ia/instrucoes.md` | Troque cada linha que começa com `[DEFINIR]` pelo seu texto (apague o `[DEFINIR]`): especialidade, público, o que responde, o que não pode fazer, quando encaminhar para um humano, formato da resposta. Linhas que ainda têm `[DEFINIR]` são ignoradas |
 | **3. Base de conhecimento** | `ia/conhecimento/` | Coloque leis, manuais, perguntas frequentes e tabelas em `.txt` ou `.md` (PDF: copie o texto e salve como `.txt`) |
-| **4. Sempre atual** | `ia/fontes.txt` e `ia/atualizar.txt` | Em `fontes.txt`, os sites oficiais onde a IA pode pesquisar. Em `atualizar.txt`, as páginas que o robô baixa para a base quando você roda **`Atualizar Base`** |
+| **4. Sempre atual** | `ia/fontes.txt` e `ia/atualizar.txt` | Em `fontes.txt`, os sites oficiais onde a IA pode pesquisar (se nenhuma linha for um site válido, a pesquisa na web fica desligada e a tela avisa). Em `atualizar.txt`, as páginas e feeds RSS que o robô baixa para a base quando você roda **`Atualizar Base`**; o resultado da última execução aparece em **⚙ Configurar** |
 | **5. Canal** | — | Começa nesta tela de chat, no seu computador. Site ou WhatsApp vêm depois |
 | **6. Teste** | `ia/perguntas_teste.json` | Escreva ~30 perguntas reais com a resposta certa e rode **`Testar IA`**. O resultado sai em `ia/resultado_teste.md`, com o que acertou e o que errou |
 

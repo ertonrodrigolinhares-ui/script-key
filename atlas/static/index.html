@@ -185,6 +185,7 @@ async function enviar(texto) {
           resposta = resposta.slice(0, -ev.texto.length);
           caixa.innerHTML = formatar(resposta);
         } else if (ev.tipo === "memoria") $("mensagens").insertBefore(novaLinha("status", "🧠 " + ev.texto), status);
+        else if (ev.tipo === "aviso") $("mensagens").insertBefore(novaLinha("status erro", "⚠ " + ev.texto), status);
         else if (ev.tipo === "status") status.textContent = ev.texto;
         else if (ev.tipo === "erro") { status.textContent = ev.texto; status.classList.add("erro"); }
         rolarFim();
@@ -246,6 +247,8 @@ async function abrirConfig() {
     if (ia.erro) avisos.push(ia.erro);
     if (ia.pendentes) avisos.push(`${ia.pendentes} item(ns) [DEFINIR] ainda sem preencher em instrucoes.md`);
     if (ia.documentos_fora.length) avisos.push(`${ia.documentos_fora.length} documento(s) grandes demais, ignorados: ${ia.documentos_fora.join(", ")}`);
+    if (ia.pesquisa_desligada) avisos.push("pesquisa na web DESLIGADA: fontes.txt não tem nenhum site válido");
+    if (ia.robo) avisos.push("robô de atualização: " + ia.robo);
     if (ia.fontes_recusadas.length) avisos.push(`linhas de fontes.txt ignoradas (não são um site válido): ${ia.fontes_recusadas.join(" | ")}`);
   }
   $("ia-resumo").textContent = ia
