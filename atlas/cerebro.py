@@ -17,16 +17,14 @@ from collections.abc import Iterator
 import anthropic
 import httpx2
 
-from . import memoria
+from . import especialidade, memoria
 from .config import ESFORCO, MODELO, ler_chave
-from .persona import SISTEMA
 
 BETAS = ["server-side-fallback-2026-07-01"]
 MAX_VOLTAS = 8  # idas e vindas com ferramentas numa mesma resposta
 MAX_JSON_INVALIDO = 2  # novas tentativas seguidas quando a entrada de uma ferramenta vem quebrada
 
-FERRAMENTAS = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 5},
+FERRAMENTAS_MEMORIA = [
     {
         "name": "guardar_memoria",
         "description": (
@@ -183,9 +181,9 @@ class Conversa:
                     max_tokens=64000,
                     betas=BETAS,
                     fallbacks="default",
-                    system=[{"type": "text", "text": SISTEMA, "cache_control": {"type": "ephemeral"}}],
+                    system=especialidade.sistema(),
                     output_config={"effort": ESFORCO},
-                    tools=FERRAMENTAS,
+                    tools=[especialidade.pesquisa_web(), *FERRAMENTAS_MEMORIA],
                     messages=self.mensagens,
                 ) as fluxo:
                     for evento in fluxo:

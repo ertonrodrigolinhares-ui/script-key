@@ -1,0 +1,6 @@
+# FASE 3/4 — FONTES DA PESQUISA NA WEB
+# Um site por linha (só o domínio, sem https://). Ex.:
+#   planalto.gov.br
+#   gov.br
+# Com a lista vazia, a IA pesquisa em qualquer site.
+# Com sites listados, ela pesquisa SÓ neles. Poucas fontes boas valem mais que muitas ruins.

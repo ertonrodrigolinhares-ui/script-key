@@ -4,3 +4,4 @@ __pycache__/
 .env
 config.env
 .pytest_cache/
+ia/resultado_teste.md

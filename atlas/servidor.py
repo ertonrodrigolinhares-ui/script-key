@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import memoria
+from . import especialidade, memoria
 from .cerebro import Conversa
 from .config import ler_chave, pasta_dados, salvar_chave
 
@@ -54,7 +54,12 @@ def pagina():
 
 @app.get("/api/estado")
 def estado():
-    return {"tem_chave": bool(ler_chave()), "memoria": memoria.listar(), "pasta": str(pasta_dados())}
+    return {
+        "tem_chave": bool(ler_chave()),
+        "memoria": memoria.listar(),
+        "pasta": str(pasta_dados()),
+        "ia": especialidade.resumo(),
+    }
 
 
 @app.post("/api/chave")

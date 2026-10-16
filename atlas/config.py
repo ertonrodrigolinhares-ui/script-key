@@ -1,7 +1,7 @@
 """Configuração do Atlas: pasta de dados e chave da Anthropic.
 
-Tudo fica em <pasta do usuário>\\Documents\\Atlas (a pasta local, fora do OneDrive),
-separado do Jarvis. O caminho exato aparece na janela preta ao iniciar e em ⚙ Configurar.
+Tudo fica em <pasta do usuário>\\Documents\\Atlas (a pasta local, fora do OneDrive).
+O caminho exato aparece na janela preta ao iniciar e em ⚙ Configurar.
 A pasta pode ser trocada com a variável de ambiente ATLAS_PASTA.
 """
 

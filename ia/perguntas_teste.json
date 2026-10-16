@@ -1,0 +1,10 @@
+[
+  {
+    "pergunta": "EXEMPLO — troque por uma pergunta real da sua área",
+    "resposta_esperada": "O que uma resposta correta precisa dizer (números, prazos, fonte)."
+  },
+  {
+    "pergunta": "EXEMPLO — uma pergunta fora do escopo, que a IA deve recusar",
+    "resposta_esperada": "A IA deve dizer que não responde esse assunto e indicar a quem procurar."
+  }
+]

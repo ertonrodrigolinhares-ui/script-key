@@ -105,6 +105,8 @@
   <h4>O que eu lembro</h4>
   <ul id="lista-memoria"></ul>
   <p class="status">Chave e memória ficam em: <code id="pasta"></code></p>
+  <h4>Definição da IA</h4>
+  <p class="status" id="ia-resumo"></p>
   <div class="linha">
     <button type="button" id="fechar-config">Fechar</button>
     <button type="button" class="principal" id="salvar-chave">Salvar chave</button>
@@ -229,6 +231,11 @@ async function abrirConfig() {
   const estado = await r.json();
   $("chave-aviso").textContent = estado.tem_chave ? "Chave já configurada. Cole outra só se quiser trocar." : "Nenhuma chave configurada ainda.";
   $("pasta").textContent = estado.pasta;
+  const ia = estado.ia;
+  $("ia-resumo").textContent =
+    `Pasta: ${ia.pasta} · Documentos na base: ${ia.documentos}` +
+    (ia.documentos_fora.length ? ` (${ia.documentos_fora.length} grandes demais, ignorados)` : "") +
+    ` · Pesquisa na web: ${ia.fontes.length ? ia.fontes.join(", ") : "qualquer site"}`;
   const lista = $("lista-memoria");
   lista.innerHTML = "";
   if (!estado.memoria.length) lista.innerHTML = "<li class='status'>Nada guardado ainda.</li>";

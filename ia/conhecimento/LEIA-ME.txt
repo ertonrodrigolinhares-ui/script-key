@@ -1,0 +1,11 @@
+FASE 3 — BASE DE CONHECIMENTO
+
+Coloque aqui os documentos que a IA deve consultar antes de responder:
+leis, manuais, perguntas frequentes, tabelas.
+
+- Formatos lidos: .md e .txt (texto puro).
+- PDF ou Word: abra o arquivo, copie o texto e salve como .txt nesta pasta.
+- Use nomes claros (ex.: "lei-123-2006.txt"); a IA cita o nome do arquivo como fonte.
+- A pasta "atualizacoes" é preenchida pelo robô de atualização (Atualizar Base).
+
+Este arquivo LEIA-ME não é enviado para a IA.

@@ -13,6 +13,7 @@ from atlas.cerebro import CONVERSA_LONGA
 @pytest.fixture(autouse=True)
 def pasta_temporaria(tmp_path, monkeypatch):
     monkeypatch.setenv("ATLAS_PASTA", str(tmp_path))
+    monkeypatch.setenv("ATLAS_IA", str(tmp_path / "ia"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     from atlas import servidor
 
@@ -503,3 +504,105 @@ def test_servidor_recusa_pedido_de_outro_site():
 
     assert ler_chave() is None
     assert web.post("/api/chave", json={"chave": "sk-ant-x"}, headers={"Origin": "http://127.0.0.1:8765"}).status_code == 200
+
+
+# ---------- definição da IA (pasta ia/) ----------
+
+def _ia(tmp_path_factory=None):
+    from atlas.especialidade import pasta_ia
+
+    pasta = pasta_ia()
+    (pasta / "conhecimento").mkdir(parents=True, exist_ok=True)
+    return pasta
+
+
+def test_sem_pasta_ia_usa_instrucoes_padrao():
+    from atlas import especialidade
+    from atlas.persona import SISTEMA
+
+    assert especialidade.sistema() == [{"type": "text", "text": SISTEMA, "cache_control": {"type": "ephemeral"}}]
+    assert "allowed_domains" not in especialidade.pesquisa_web()
+
+
+def test_instrucoes_documentos_e_fontes_da_pasta_ia():
+    from atlas import especialidade
+
+    pasta = _ia()
+    (pasta / "instrucoes.md").write_text("<!-- anotação -->\nVocê é especialista em X.", encoding="utf-8")
+    (pasta / "conhecimento" / "lei.txt").write_text("Art. 1º Regra.", encoding="utf-8")
+    (pasta / "conhecimento" / "LEIA-ME.txt").write_text("não vai", encoding="utf-8")
+    (pasta / "conhecimento" / "foto.png").write_bytes(b"x")
+    (pasta / "fontes.txt").write_text("# comentário\nhttps://www.planalto.gov.br/x\ngov.br\n", encoding="utf-8")
+    blocos = especialidade.sistema()
+    assert blocos[0] == {"type": "text", "text": "Você é especialista em X."}
+    assert '<documento nome="lei.txt">' in blocos[1]["text"] and "não vai" not in blocos[1]["text"]
+    assert blocos[1]["cache_control"] == {"type": "ephemeral"}
+    assert especialidade.pesquisa_web()["allowed_domains"] == ["www.planalto.gov.br", "gov.br"]
+    assert especialidade.resumo()["documentos"] == 1
+
+
+def test_documentos_grandes_demais_ficam_de_fora(monkeypatch):
+    from atlas import especialidade
+
+    pasta = _ia()
+    monkeypatch.setattr(especialidade, "LIMITE_DOCUMENTOS", 10)
+    (pasta / "conhecimento" / "a.txt").write_text("12345", encoding="utf-8")
+    (pasta / "conhecimento" / "b.txt").write_text("1234567890", encoding="utf-8")
+    texto, fora = especialidade.documentos()
+    assert 'nome="a.txt"' in texto and fora == ["b.txt"]
+
+
+def test_cerebro_usa_a_definicao_da_ia():
+    from atlas.cerebro import Conversa
+
+    pasta = _ia()
+    (pasta / "instrucoes.md").write_text("Você é o Bot X.", encoding="utf-8")
+    (pasta / "fontes.txt").write_text("gov.br", encoding="utf-8")
+    cliente = ClienteFalso([_texto("Oi.")])
+    list(Conversa(cliente).responder("Oi"))
+    chamada = cliente.chamadas[0]
+    assert chamada["system"][0]["text"] == "Você é o Bot X."
+    assert chamada["tools"][0]["allowed_domains"] == ["gov.br"]
+    assert [t["name"] for t in chamada["tools"]] == ["web_search", "guardar_memoria", "esquecer_memoria"]
+
+
+def test_robo_de_atualizacao_baixa_paginas():
+    from atlas import atualizar
+
+    pasta = _ia()
+    (pasta / "atualizar.txt").write_text(
+        "# exemplo\nNotícias Receita | https://exemplo.gov.br/noticias\nquebrada | https://exemplo.gov.br/404\n",
+        encoding="utf-8",
+    )
+
+    def rota(pedido):
+        if pedido.url.path == "/404":
+            return httpx2.Response(404)
+        html = "<html><script>x()</script><h1>Nova regra</h1><p>Vale a partir de 2027.</p></html>"
+        return httpx2.Response(200, html=html)
+
+    relatorio = atualizar.atualizar(httpx2.Client(transport=httpx2.MockTransport(rota)))
+    assert relatorio[0].startswith("OK") and relatorio[1].startswith("FALHOU")
+    salvo = (pasta / "conhecimento" / "atualizacoes" / "noticias-receita.md").read_text(encoding="utf-8")
+    assert "Nova regra" in salvo and "Vale a partir de 2027." in salvo and "x()" not in salvo
+    assert "Fonte: https://exemplo.gov.br/noticias" in salvo
+
+
+def test_teste_com_perguntas_reais_gera_relatorio():
+    import json
+
+    from atlas import avaliar
+
+    pasta = _ia()
+    (pasta / "perguntas_teste.json").write_text(json.dumps([
+        {"pergunta": "Qual o prazo?", "resposta_esperada": "Dia 20."},
+        {"pergunta": "E o outro?", "resposta_esperada": "Dia 31."},
+    ]), encoding="utf-8")
+    cliente = ClienteFalso([_texto("Vence dia 20."), _texto("Vence dia 10.")])
+    notas = iter(["CERTO\nBateu.", "ERRADO\nDisse 10, esperado 31."])
+    cliente.messages = SimpleNamespace(create=lambda **kw: SimpleNamespace(
+        content=[SimpleNamespace(type="text", text=next(notas))]))
+    resumo = avaliar.avaliar(cliente)
+    assert resumo.startswith("Acertos: 1 de 2")
+    relatorio = (pasta / "resultado_teste.md").read_text(encoding="utf-8")
+    assert "✅ CERTO" in relatorio and "❌ ERRADO" in relatorio and "Vence dia 10." in relatorio
