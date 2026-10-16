@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Atlas - IA pessoal do Erton
+title Atlas - assistente de IA
 cd /d "%~dp0"
 
 if not exist "requirements.txt" (

@@ -30,8 +30,8 @@ FERRAMENTAS = [
     {
         "name": "guardar_memoria",
         "description": (
-            "Guarda um fato duradouro sobre o Erton, a família, a empresa ou as "
-            "preferências dele, para lembrar em conversas futuras. Uma frase curta e "
+            "Guarda um fato duradouro sobre o usuário ou as preferências dele, "
+            "para lembrar em conversas futuras. Uma frase curta e "
             "autoexplicativa por fato. Nunca use para senhas, chaves ou dados de clientes."
         ),
         "input_schema": {

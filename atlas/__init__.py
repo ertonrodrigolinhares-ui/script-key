@@ -1,1 +1,1 @@
-"""Atlas — inteligência artificial pessoal do Erton."""
+"""Atlas — assistente de inteligência artificial."""

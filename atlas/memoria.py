@@ -1,4 +1,4 @@
-"""Memória de longo prazo do Atlas: fatos que o Erton pede para guardar."""
+"""Memória de longo prazo do Atlas: fatos que o usuário pede para guardar."""
 
 import json
 import os

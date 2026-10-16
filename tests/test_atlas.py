@@ -90,10 +90,10 @@ def _historico_valido(mensagens):
 def test_memoria_guardar_e_esquecer():
     from atlas import memoria
 
-    assert memoria.guardar("Aniversário da Yvnna é em maio") == "Guardado na memória."
-    assert memoria.guardar("aniversário da yvnna é em maio") == "Isso já estava na memória."
-    assert "Yvnna" in memoria.como_texto()
-    assert memoria.esquecer("yvnna") == "Esqueci 1 item(ns) da memória."
+    assert memoria.guardar("Reuniões sempre às 9h") == "Guardado na memória."
+    assert memoria.guardar("reuniões sempre às 9h") == "Isso já estava na memória."
+    assert "Reuniões" in memoria.como_texto()
+    assert memoria.esquecer("reuniões") == "Esqueci 1 item(ns) da memória."
     assert memoria.como_texto() == "(memória vazia)"
 
 
@@ -141,9 +141,9 @@ def test_chave_salva_vale_mais_que_variavel_de_ambiente(monkeypatch):
 def test_resposta_simples_e_memoria_na_abertura():
     from atlas.cerebro import Conversa
 
-    cliente = ClienteFalso([_texto("Olá, Erton.")])
+    cliente = ClienteFalso([_texto("Olá!")])
     eventos = list(Conversa(cliente).responder("Oi"))
-    assert eventos == [{"tipo": "texto", "texto": "Olá, Erton."}]
+    assert eventos == [{"tipo": "texto", "texto": "Olá!"}]
     chamada = cliente.chamadas[0]
     assert chamada["model"] == "claude-opus-5-5"
     assert chamada["fallbacks"] == "default"
@@ -206,7 +206,7 @@ def test_corte_por_tamanho_com_ferramenta_pendente():
     from atlas import memoria
     from atlas.cerebro import Conversa
 
-    uso = Bloco(type="tool_use", id="t9", name="guardar_memoria", input={"fato": "Erton tem"})
+    uso = Bloco(type="tool_use", id="t9", name="guardar_memoria", input={"fato": "Usuário tem"})
     cortada = ([], SimpleNamespace(stop_reason="max_tokens", content=[uso]))
     conversa = Conversa(ClienteFalso([cortada]))
     eventos = list(conversa.responder("Oi"))
@@ -220,14 +220,14 @@ def test_fallback_descarta_ferramenta_do_modelo_que_recusou():
     from atlas.cerebro import Conversa
 
     conteudo = [
-        Bloco(type="tool_use", id="velho", name="guardar_memoria", input={"fato": "Erton tem"}),
+        Bloco(type="tool_use", id="velho", name="guardar_memoria", input={"fato": "Usuário tem"}),
         Bloco(type="fallback"),
-        Bloco(type="tool_use", id="novo", name="guardar_memoria", input={"fato": "Erton treina cedo"}),
+        Bloco(type="tool_use", id="novo", name="guardar_memoria", input={"fato": "Treina cedo"}),
     ]
     cliente = ClienteFalso([([], SimpleNamespace(stop_reason="tool_use", content=conteudo)), _texto("Ok.")])
     conversa = Conversa(cliente)
     list(conversa.responder("Lembre que treino cedo"))
-    assert [f["fato"] for f in memoria.listar()] == ["Erton treina cedo"]
+    assert [f["fato"] for f in memoria.listar()] == ["Treina cedo"]
     assert [b["type"] for b in conversa.mensagens[1]["content"]] == ["fallback", "tool_use"]
     _historico_valido(conversa.mensagens)
 

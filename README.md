@@ -1,4 +1,4 @@
-# Atlas — IA pessoal do Erton
+# Atlas — assistente de IA
 
 O Atlas é uma inteligência artificial com a personalidade de um braço direito estratégico.
 Ele é separado do Jarvis: tem pasta, memória e chave próprias.
@@ -10,7 +10,7 @@ O cérebro é o **Claude** (Anthropic), e a conversa acontece numa tela de chat 
   sucessão, M&A, contabilidade, tributação (inclusive Reforma Tributária) e gestão.
 - Escreve e-mails, propostas, posts e discursos na sua voz.
 - Pesquisa na web quando o assunto depende de informação atual, e cita as fontes.
-- Lembra do que você pede: "Atlas, lembre que o aniversário da Yvnna é em maio".
+- Lembra do que você pede: "Atlas, lembre que o minhas reuniões são sempre às 9h".
   Para ver ou apagar o que ele lembra, use **⚙ Configurar**.
 
 ## Instalação no Windows

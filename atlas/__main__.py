@@ -25,7 +25,7 @@ def _abrir_quando_pronto(endereco: str, porta: int) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Atlas — IA pessoal do Erton")
+    parser = argparse.ArgumentParser(description="Atlas — assistente de IA")
     parser.add_argument("--porta", type=int, default=8765)
     parser.add_argument("--sem-navegador", action="store_true")
     args = parser.parse_args()
